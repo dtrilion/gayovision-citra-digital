@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GayoVision Lab — WebAR/VR & GenAI Pengolahan Citra Digital</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    a-scene { width: 100%; height: 100%; border-radius: 0.75rem; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Header & Progress Bar 15-20 Menit -->
+  <header class="bg-slate-900/90 border-b border-slate-800 sticky top-0 z-50 backdrop-blur">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-amber-600 flex items-center justify-center font-bold text-white shadow-lg shadow-amber-600/20">
+          GV
+        </div>
+        <div>
+          <h1 class="font-bold text-base sm:text-lg leading-tight text-white">GayoVision Lab <span class="text-xs font-normal px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 ml-1">WebAR/VR + GenAI</span></h1>
+          <p class="text-xs text-slate-400">Pengolahan Citra Digital: Sortasi Mutu Kopi Arabika Gayo</p>
+        </div>
+      </div>
+
+      <!-- Navigasi Tahap Pembelajaran -->
+      <nav class="flex items-center gap-1.5 bg-slate-800 p-1 rounded-lg border border-slate-700 text-xs">
+        <button onclick="switchStage(1)" id="tab-1" class="stage-btn px-3 py-1.5 rounded-md font-medium bg-amber-600 text-white transition">1. VR Akuisisi (4m)</button>
+        <button onclick="switchStage(2)" id="tab-2" class="stage-btn px-3 py-1.5 rounded-md font-medium text-slate-300 hover:text-white transition">2. AR Segmentasi HSV (6m)</button>
+        <button onclick="switchStage(3)" id="tab-3" class="stage-btn px-3 py-1.5 rounded-md font-medium text-slate-300 hover:text-white transition">3. Deteksi Tepi Cacat (5m)</button>
+        <button onclick="switchStage(4)" id="tab-4" class="stage-btn px-3 py-1.5 rounded-md font-medium text-slate-300 hover:text-white transition">4. Tantangan GenAI (5m)</button>
+      </nav>
+
+      <!-- Timer Sesi -->
+      <div class="hidden md:flex items-center gap-2 text-xs bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="text-slate-400">Sesi Praktikum:</span>
+        <span id="session-timer" class="mono font-semibold text-emerald-400">20:00</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+    
+    <!-- Kolom Kiri (8 Kolom): Viewport Interaktif VR / AR -->
+    <section class="lg:col-span-8 flex flex-col gap-4">
+      
+      <!-- TAHAP 1: VR LAB AKUISIS CITRA (A-FRAME 3D) -->
+      <div id="stage-1" class="stage-panel bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 class="font-semibold text-white text-base">Tahap 1: Simulasi Pencahayaan Ruang Akuisisi (WebVR Lab)</h2>
+            <p class="text-xs text-slate-400">Seret layar untuk melihat sekeliling lab 360°. Ubah kondisi cahaya untuk mengamati pantulan spekular dan bayangan pada biji kopi Gayo.</p>
+          </div>
+          <div class="flex gap-1.5">
+            <button onclick="setVRLighting('normal')" class="px-2.5 py-1 text-xs rounded bg-slate-800 hover:bg-slate-700 border border-slate-600 text-amber-300">Cahaya Ideal (D65)</button>
+            <button onclick="setVRLighting('dim')" class="px-2.5 py-1 text-xs rounded bg-slate-800 hover:bg-slate-700 border border-slate-600 text-blue-300">Redup (Low-Light)</button>
+            <button onclick="setVRLighting('over')" class="px-2.5 py-1 text-xs rounded bg-slate-800 hover:bg-slate-700 border border-slate-600 text-rose-300">Silau (Overexposure)</button>
+          </div>
+        </div>
+
+        <!-- A-Frame VR Canvas -->
+        <div class="relative w-full h-[380px] rounded-xl overflow-hidden border border-slate-700 bg-black">
+          <a-scene embedded vr-mode-ui="enabled: true">
+            <a-sky id="vr-sky" color="#1e293b"></a-sky>
+            
+            <!-- Pencahayaan Dinamis -->
+            <a-light id="vr-ambient" type="ambient" color="#ffffff" intensity="0.6"></a-light>
+            <a-light id="vr-spot" type="spot" position="0 4 1" rotation="-75 0 0" angle="45" intensity="1.4" color="#fffbeb"></a-light>
+
+            <!-- Meja Sortasi Kopi Gayo -->
+            <a-box position="0 0.5 -2.2" width="3.2" height="0.1" depth="1.6" color="#334155"></a-box>
+            <a-cylinder position="-1.4 0.25 -2.8" radius="0.06" height="0.5" color="#1e293b"></a-cylinder>
+            <a-cylinder position="1.4 0.25 -2.8" radius="0.06" height="0.5" color="#1e293b"></a-cylinder>
+
+            <!-- Kamera Akuisisi Overhead -->
+            <a-box position="0 2.3 -2.2" width="0.3" height="0.2" depth="0.3" color="#0f172a"></a-box>
+            <a-cylinder position="0 2.15 -2.2" radius="0.08" height="0.15" color="#38bdf8"></a-cylinder>
+            <a-cone position="0 1.4 -2.2" radius-bottom="0.9" radius-top="0.08" height="1.4" color="#38bdf8" opacity="0.12" open-ended="true"></a-cone>
+
+            <!-- Sampel Biji Kopi Gayo 3D (Ceri Merah, Mengkal Kuning, Mentah Hijau, Biji Cacat Hitam) -->
+            <a-sphere position="-0.7 0.65 -2.1" scale="0.14 0.1 0.18" color="#dc2626" roughness="0.3"></a-sphere>
+            <a-sphere position="-0.35 0.65 -2.3" scale="0.14 0.1 0.18" color="#b91c1c" roughness="0.3"></a-sphere>
+            <a-sphere position="0 0.65 -2.0" scale="0.14 0.1 0.18" color="#eab308" roughness="0.4"></a-sphere>
+            <a-sphere position="0.4 0.65 -2.25" scale="0.14 0.1 0.18" color="#16a34a" roughness="0.4"></a-sphere>
+            <a-sphere position="0.75 0.65 -2.05" scale="0.13 0.09 0.17" color="#292524" roughness="0.8"></a-sphere>
+
+            <!-- Label 3D -->
+            <a-text value="AREA AKUISIS CITRA KOPI GAYO" position="-1.1 1.1 -2.8" color="#fbbf24" width="3.5"></a-text>
+            <a-text id="vr-status-text" value="Iluminasi: Ideal (SNR Tinggi, Kontras Optimal)" position="-1.15 0.92 -2.8" color="#e2e8f0" width="2.8"></a-text>
+
+            <a-camera position="0 1.55 0.2"></a-camera>
+          </a-scene>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 text-xs bg-slate-800/70 p-3 rounded-lg border border-slate-700">
+          <div>
+            <span class="text-slate-400 block">Signal-to-Noise Ratio (SNR)</span>
+            <span id="metric-snr" class="mono font-semibold text-emerald-400">34.2 dB (Optimal)</span>
+          </div>
+          <div>
+            <span class="text-slate-400 block">Distorsi Bayangan</span>
+            <span id="metric-shadow" class="mono font-semibold text-emerald-400">Rendah (4.1%)</span>
+          </div>
+          <div>
+            <span class="text-slate-400 block">Rekomendasi Ruang Warna</span>
+            <span id="metric-space" class="mono font-semibold text-amber-300">HSV / CIELAB</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAHAP 2 & 3: AR SEGMENTASI HSV & DETEKSI TEPI REAL-TIME -->
+      <div id="stage-2-3" class="hidden stage-panel bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 id="ar-title" class="font-semibold text-white text-base">Tahap 2: Segmentasi Ruang Warna HSV (AR Overlay)</h2>
+            <p id="ar-desc" class="text-xs text-slate-400">Geser rentang Hue (H) untuk memisahkan buah kopi Gayo matang (merah) dari mentah (hijau) dan cacat.</p>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="startWebcamAR()" id="btn-webcam" class="px-3 py-1.5 text-xs rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition">
+              Aktifkan Kamera AR
+            </button>
+            <button onclick="useSyntheticBeans()" class="px-3 py-1.5 text-xs rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 transition">
+              Citra Sampel Gayo
+            </button>
+          </div>
+        </div>
+
+        <!-- Dual Viewport: Input Citra/Kamera vs Hasil Segmentasi/Deteksi Tepi -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="relative bg-black rounded-lg overflow-hidden border border-slate-700 aspect-[4/3]">
+            <span class="absolute top-2 left-2 z-10 text-[10px] uppercase tracking-wider bg-slate-900/80 px-2 py-0.5 rounded text-slate-300 border border-slate-700">Citra Input (RGB)</span>
+            <video id="ar-video" autoplay playsinline class="hidden w-full h-full object-cover"></video>
+            <canvas id="source-canvas" width="400" height="300" class="w-full h-full object-cover"></canvas>
+          </div>
+          <div class="relative bg-black rounded-lg overflow-hidden border border-amber-500/40 aspect-[4/3]">
+            <span id="output-badge" class="absolute top-2 left-2 z-10 text-[10px] uppercase tracking-wider bg-amber-950/90 px-2 py-0.5 rounded text-amber-300 border border-amber-500/40">AR Masking Output</span>
+            <canvas id="output-canvas" width="400" height="300" class="w-full h-full object-cover"></canvas>
+          </div>
+        </div>
+
+        <!-- Kontrol Parameter Tahap 2 (HSV Thresholding) -->
+        <div id="controls-hsv" class="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-800/80 p-3 rounded-lg border border-slate-700 text-xs">
+          <div>
+            <div class="flex justify-between mb-1">
+              <label class="text-slate-300 font-medium">Hue Maksimum (Merah)</label>
+              <span id="val-hue" class="mono text-amber-400">25°</span>
+            </div>
+            <input type="range" id="slider-hue" min="0" max="180" value="25" oninput="processImage()" class="w-full accent-amber-500">
+          </div>
+          <div>
+            <div class="flex justify-between mb-1">
+              <label class="text-slate-300 font-medium">Saturation Minimum</label>
+              <span id="val-sat" class="mono text-amber-400">40%</span>
+            </div>
+            <input type="range" id="slider-sat" min="0" max="100" value="40" oninput="processImage()" class="w-full accent-amber-500">
+          </div>
+          <div>
+            <div class="flex justify-between mb-1">
+              <label class="text-slate-300 font-medium">Mode Tampilan AR</label>
+              <span class="text-emerald-400 font-medium">Real-Time</span>
+            </div>
+            <select id="select-mask-mode" onchange="processImage()" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-slate-200">
+              <option value="overlay">AR Bounding & Mask Overlay</option>
+              <option value="binary">Citra Biner (Hitam-Putih)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Kontrol Parameter Tahap 3 (Deteksi Tepi Konvolusi) -->
+        <div id="controls-edge" class="hidden grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-800/80 p-3 rounded-lg border border-slate-700 text-xs">
+          <div>
+            <label class="text-slate-300 font-medium block mb-1">Operator Konvolusi</label>
+            <select id="select-edge-op" onchange="processImage()" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-slate-200">
+              <option value="sobel">Operator Sobel (Gradien 3x3)</option>
+              <option value="laplacian">Operator Laplacian (Turunan ke-2)</option>
+            </select>
+          </div>
+          <div>
+            <div class="flex justify-between mb-1">
+              <label class="text-slate-300 font-medium">Ambang Batas Tepi (Threshold)</label>
+              <span id="val-edge-th" class="mono text-amber-400">65</span>
+            </div>
+            <input type="range" id="slider-edge-th" min="15" max="200" value="65" oninput="processImage()" class="w-full accent-amber-500">
+          </div>
+          <div class="flex flex-col justify-center">
+            <span class="text-slate-400">Indikasi Cacat Biji (Retak/Berlubang):</span>
+            <span id="defect-score" class="mono font-semibold text-rose-400 text-sm mt-0.5">Terdeteksi 1 Biji Cacat</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAHAP 4: DIAGNOSTIC CHALLENGE & KUIS GENAI -->
+      <div id="stage-4" class="hidden stage-panel bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col gap-4">
+        <div>
+          <span class="text-xs font-semibold uppercase tracking-wider text-amber-400">Evaluasi Berbasis Masalah (HOTS)</span>
+          <h2 class="font-semibold text-white text-base mt-0.5">Studi Kasus Sortasi Kopi Gayo di Dataran Tinggi Takengon</h2>
+          <p class="text-xs text-slate-400 mt-1">Selesaikan skenario berikut berdasarkan hasil eksperimen VR dan AR Anda sebelumnya.</p>
+        </div>
+
+        <div class="bg-slate-800/70 p-4 rounded-lg border border-slate-700 text-sm text-slate-200 leading-relaxed">
+          <p><strong>Skenario:</strong> Sebuah unit pengolahan kopi di Aceh Tengah memasang kamera sortasi biji kopi basah (*cherry*). Namun, pada siang hari cahaya matahari menembus atap transparan sehingga menciptakan bayangan tajam dan kilau cahaya pada kulit biji kopi. Akibatnya, segmentasi menggunakan ruang warna <strong>RGB</strong> gagal total karena nilai R, G, dan B berubah drastis di area bayangan.</p>
+          <p class="mt-2 text-amber-300 font-medium">Pertanyaan: Kombinasi langkah pra-pemrosesan dan ruang warna apa yang paling tepat diterapkan?</p>
+        </div>
+
+        <div class="grid grid-cols-1 gap-2.5 text-xs">
+          <button onclick="evaluateQuiz('A')" class="text-left p-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 transition">
+            <strong class="text-amber-400">A.</strong> Mengonversi citra RGB ke ruang warna <strong>HSV</strong>, menerapkan <em>Gaussian Blur</em> untuk meredam kilau noise, lalu melakukan <em>thresholding</em> terutama pada kanal <strong>Hue (H)</strong>.
+          </button>
+          <button onclick="evaluateQuiz('B')" class="text-left p-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 transition">
+            <strong class="text-amber-400">B.</strong> Langsung menerapkan deteksi tepi <em>Canny</em> pada citra RGB tanpa konversi ruang warna agar kontur bayangan ikut terhitung sebagai biji cacat.
+          </button>
+          <button onclick="evaluateQuiz('C')" class="text-left p-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 transition">
+            <strong class="text-amber-400">C.</strong> Menaikkan nilai kanal <em>Brightness/Value</em> secara maksimal hingga seluruh piksel menjadi putih agar bayangan menghilang.
+          </button>
+        </div>
+
+        <div id="quiz-feedback" class="hidden p-3.5 rounded-lg text-xs leading-relaxed border"></div>
+      </div>
+
+    </section>
+
+    <!-- Kolom Kanan (4 Kolom): Panel Tutor GenAI Kontekstual -->
+    <aside class="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between h-[560px]">
+      <div class="flex flex-col gap-3 overflow-hidden h-full">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-indigo-400"></span>
+            <h3 class="font-semibold text-sm text-white">Asisten Praktikum GenAI</h3>
+          </div>
+          <button onclick="explainCurrentParams()" class="text-[11px] bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 px-2.5 py-1 rounded transition">
+            Analisis Parameter Saat Ini
+          </button>
+        </div>
+
+        <!-- Riwayat Percakapan GenAI -->
+        <div id="ai-chat-box" class="flex-1 overflow-y-auto space-y-3 pr-1 text-xs leading-relaxed">
+          <div class="bg-slate-800/90 border border-slate-700 rounded-lg p-3 text-slate-200">
+            <span class="font-semibold text-indigo-400 block mb-1">Tutor GenAI:</span>
+            Selamat datang di <strong>GayoVision Lab</strong>! Saya memantau parameter pengolahan citra Anda secara real-time. Silakan atur pencahayaan di <strong>Tahap 1 (VR)</strong> atau geser <em>slider</em> segmentasi di <strong>Tahap 2 (AR)</strong>, lalu klik <em>"Analisis Parameter Saat Ini"</em> atau ajukan pertanyaan di bawah.
+          </div>
+        </div>
+
+        <!-- Pertanyaan Cepat (Prompt Chips) -->
+        <div class="flex flex-wrap gap-1.5 pt-1">
+          <button onclick="askPreset('Mengapa HSV lebih baik dari RGB untuk sortasi kopi?')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded border border-slate-700">HSV vs RGB?</button>
+          <button onclick="askPreset('Bagaimana rumus matriks operator Sobel bekerja?')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded border border-slate-700">Rumus Sobel?</button>
+          <button onclick="askPreset('Beri studi kasus acak kopi Gayo')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded border border-slate-700">Kasus Acak</button>
+        </div>
+
+        <!-- Input Chat GenAI -->
+        <form onsubmit="handleUserChat(event)" class="flex gap-2 pt-2 border-t border-slate-800">
+          <input type="text" id="ai-input" placeholder="Tanya konsep citra / rumus..." class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500" />
+          <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-2 rounded-lg transition">Kirim</button>
+        </form>
+      </div>
+    </aside>
+
+  </main>
+
+  <script>
+    // State Global Aplikasi
+    let currentStage = 1;
+    let useWebcam = false;
+    let videoStream = null;
+    let animFrameId = null;
+
+    const srcCanvas = document.getElementById('source-canvas');
+    const srcCtx = srcCanvas.getContext('2d', { willReadFrequently: true });
+    const outCanvas = document.getElementById('output-canvas');
+    const outCtx = outCanvas.getContext('2d', { willReadFrequently: true });
+    const videoEl = document.getElementById('ar-video');
+
+    // Timer Sesi 20 Menit
+    let timeRemaining = 20 * 60;
+    setInterval(() => {
+      if (timeRemaining > 0) timeRemaining--;
+      const m = String(Math.floor(timeRemaining / 60)).padStart(2, '0');
+      const s = String(timeRemaining % 60).padStart(2, '0');
+      document.getElementById('session-timer').textContent = `${m}:${s}`;
+    }, 1000);
+
+    // Navigasi Antar Tahap (1-4)
+    function switchStage(stage) {
+      currentStage = stage;
+      document.querySelectorAll('.stage-btn').forEach((btn, idx) => {
+        if (idx + 1 === stage) {
+          btn.classList.add('bg-amber-600', 'text-white');
+          btn.classList.remove('text-slate-300');
+        } else {
+          btn.classList.remove('bg-amber-600', 'text-white');
+          btn.classList.add('text-slate-300');
+        }
+      });
+
+      document.getElementById('stage-1').classList.toggle('hidden', stage !== 1);
+      document.getElementById('stage-2-3').classList.toggle('hidden', stage !== 2 && stage !== 3);
+      document.getElementById('stage-4').classList.toggle('hidden', stage !== 4);
+
+      if (stage === 2) {
+        document.getElementById('ar-title').textContent = 'Tahap 2: Segmentasi Ruang Warna HSV (AR Overlay)';
+        document.getElementById('ar-desc').textContent = 'Geser rentang Hue (H) untuk memisahkan buah kopi Gayo matang (merah) dari mentah (hijau) dan cacat.';
+        document.getElementById('output-badge').textContent = 'AR HSV Segmentation';
+        document.getElementById('controls-hsv').classList.remove('hidden');
+        document.getElementById('controls-hsv').classList.add('grid');
+        document.getElementById('controls-edge').classList.add('hidden');
+        document.getElementById('controls-edge').classList.remove('grid');
+        if (!useWebcam) drawSyntheticGayoBeans();
+        processImage();
+      } else if (stage === 3) {
+        document.getElementById('ar-title').textContent = 'Tahap 3: Deteksi Tepi & Identifikasi Cacat Biji Kopi';
+        document.getElementById('ar-desc').textContent = 'Gunakan kernel konvolusi untuk mengekstrak kontur permukaan dan retakan biji kopi.';
+        document.getElementById('output-badge').textContent = 'AR Edge Convolution';
+        document.getElementById('controls-hsv').classList.add('hidden');
+        document.getElementById('controls-hsv').classList.remove('grid');
+        document.getElementById('controls-edge').classList.remove('hidden');
+        document.getElementById('controls-edge').classList.add('grid');
+        if (!useWebcam) drawSyntheticGayoBeans();
+        processImage();
+      }
+    }
+
+    // Tahap 1: Kontrol Pencahayaan VR Lab
+    function setVRLighting(mode) {
+      const spot = document.getElementById('vr-spot');
+      const amb = document.getElementById('vr-ambient');
+      const status = document.getElementById('vr-status-text');
+      const snr = document.getElementById('metric-snr');
+      const shadow = document.getElementById('metric-shadow');
+
+      if (mode === 'normal') {
+        spot.setAttribute('intensity', '1.4');
+        amb.setAttribute('intensity', '0.6');
+        status.setAttribute('value', 'Iluminasi: Ideal (SNR Tinggi, Kontras Optimal)');
+        snr.textContent = '34.2 dB (Optimal)';
+        snr.className = 'mono font-semibold text-emerald-400';
+        shadow.textContent = 'Rendah (4.1%)';
+        shadow.className = 'mono font-semibold text-emerald-400';
+      } else if (mode === 'dim') {
+        spot.setAttribute('intensity', '0.3');
+        amb.setAttribute('intensity', '0.15');
+        status.setAttribute('value', 'Iluminasi: Redup (Noise Kuantisasi Tinggi)');
+        snr.textContent = '14.8 dB (Buruk)';
+        snr.className = 'mono font-semibold text-rose-400';
+        shadow.textContent = 'Tinggi (38.5%)';
+        shadow.className = 'mono font-semibold text-rose-400';
+      } else {
+        spot.setAttribute('intensity', '3.5');
+        amb.setAttribute('intensity', '1.2');
+        status.setAttribute('value', 'Iluminasi: Overexposure (Clipping Piksel Putih)');
+        snr.textContent = '19.1 dB (Saturasi)';
+        snr.className = 'mono font-semibold text-amber-400';
+        shadow.textContent = 'Pantulan Spekular';
+        shadow.className = 'mono font-semibold text-amber-400';
+      }
+    }
+
+    // Menggambar Citra Sintetis Sampel Biji Kopi Gayo (Matang, Mengkal, Mentah, Cacat)
+    function drawSyntheticGayoBeans() {
+      srcCtx.fillStyle = '#1e293b';
+      srcCtx.fillRect(0, 0, 400, 300);
+
+      // Tekstur meja sortasi
+      srcCtx.strokeStyle = '#334155';
+      for (let i = 0; i < 400; i += 20) {
+        srcCtx.beginPath(); srcCtx.moveTo(i, 0); srcCtx.lineTo(i, 300); srcCtx.stroke();
+      }
+
+      const beans = [
+        { x: 95,  y: 90,  rx: 28, ry: 20, rot: 0.3,  color: '#dc2626', label: 'Matang (Merah)' },
+        { x: 210, y: 85,  rx: 27, ry: 19, rot: -0.4, color: '#b91c1c', label: 'Matang (Merah)' },
+        { x: 315, y: 100, rx: 26, ry: 19, rot: 0.2,  color: '#eab308', label: 'Mengkal' },
+        { x: 110, y: 210, rx: 27, ry: 19, rot: -0.2, color: '#16a34a', label: 'Mentah (Hijau)' },
+        { x: 225, y: 215, rx: 28, ry: 20, rot: 0.5,  color: '#dc2626', label: 'Matang (Merah)' },
+        { x: 320, y: 210, rx: 25, ry: 18, rot: -0.3, color: '#44403c', label: 'Cacat/Berlubang', defect: true }
+      ];
+
+      beans.forEach(b => {
+        srcCtx.save();
+        srcCtx.translate(b.x, b.y);
+        srcCtx.rotate(b.rot);
+        srcCtx.fillStyle = b.color;
+        srcCtx.beginPath();
+        srcCtx.ellipse(0, 0, b.rx, b.ry, 0, 0, Math.PI * 2);
+        srcCtx.fill();
+
+        // Garis belahan tengah biji kopi
+        srcCtx.strokeStyle = 'rgba(0,0,0,0.45)';
+        srcCtx.lineWidth = 2;
+        srcCtx.beginPath();
+        srcCtx.moveTo(-b.rx + 5, 0);
+        srcCtx.quadraticCurveTo(0, 4, b.rx - 5, 0);
+        srcCtx.stroke();
+
+        // Simulasi lubang cacat (bubuk buah kopi)
+        if (b.defect) {
+          srcCtx.fillStyle = '#090d16';
+          srcCtx.beginPath();
+          srcCtx.arc(6, -5, 5, 0, Math.PI * 2);
+          srcCtx.arc(-8, 6, 4, 0, Math.PI * 2);
+          srcCtx.fill();
+        }
+        srcCtx.restore();
+      });
+    }
+
+    // Aktifkan Kamera WebAR Nyata
+    async function startWebcamAR() {
+      try {
+        videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        videoEl.srcObject = videoStream;
+        useWebcam = true;
+        document.getElementById('btn-webcam').textContent = 'Kamera AR Aktif';
+        renderWebcamLoop();
+      } catch (err) {
+        appendAIMessage('Tutor GenAI', 'Akses kamera tidak tersedia atau ditolak browser. Sistem otomatis menggunakan <strong>Citra Sampel Kopi Gayo</strong> agar praktikum tetap berjalan lancar.');
+        useSyntheticBeans();
+      }
+    }
+
+    function useSyntheticBeans() {
+      useWebcam = false;
+      if (videoStream) {
+        videoStream.getTracks().forEach(t => t.stop());
+        videoStream = null;
+      }
+      if (animFrameId) cancelAnimationFrame(animFrameId);
+      document.getElementById('btn-webcam').textContent = 'Aktifkan Kamera AR';
+      drawSyntheticGayoBeans();
+      processImage();
+    }
+
+    function renderWebcamLoop() {
+      if (!useWebcam) return;
+      if (videoEl.readyState === videoEl.HAVE_ENOUGH_DATA) {
+        srcCtx.drawImage(videoEl, 0, 0, 400, 300);
+        processImage();
+      }
+      animFrameId = requestAnimationFrame(renderWebcamLoop);
+    }
+
+    // Konversi RGB ke HSV
+    function rgbToHsv(r, g, b) {
+      r /= 255; g /= 255; b /= 255;
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      let h, s, v = max;
+      const d = max - min;
+      s = max === 0 ? 0 : d / max;
+      if (max === min) {
+        h = 0;
+      } else {
+        switch (max) {
+          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+          case g: h = (b - r) / d + 2; break;
+          case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+      }
+      return [h * 360, s * 100, v * 100];
+    }
+
+    // Pemrosesan Citra Real-Time (Tahap 2: HSV | Tahap 3: Konvolusi Sobel/Laplacian)
+    function processImage() {
+      const imgData = srcCtx.getImageData(0, 0, 400, 300);
+      const data = imgData.data;
+      const outData = outCtx.createImageData(400, 300);
+      const dst = outData.data;
+
+      if (currentStage === 2) {
+        const maxHue = parseInt(document.getElementById('slider-hue').value);
+        const minSat = parseInt(document.getElementById('slider-sat').value);
+        const mode = document.getElementById('select-mask-mode').value;
+
+        document.getElementById('val-hue').textContent = `${maxHue}°`;
+        document.getElementById('val-sat').textContent = `${minSat}%`;
+
+        let matchedPixels = 0;
+
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i], g = data[i + 1], b = data[i + 2];
+          const [h, s, v] = rgbToHsv(r, g, b);
+
+          // Deteksi warna merah ceri kopi (Hue di sekitar 0-maxHue atau > 345)
+          const isMatch = ((h <= maxHue || h >= 345) && s >= minSat && v >= 20);
+
+          if (isMatch) {
+            matchedPixels++;
+            if (mode === 'binary') {
+              dst[i] = 255; dst[i + 1] = 255; dst[i + 2] = 255; dst[i + 3] = 255;
+            } else {
+              // AR Highlight Cyan terang di atas objek tersegmentasi
+              dst[i] = Math.min(255, r + 40);
+              dst[i + 1] = 230;
+              dst[i + 2] = 180;
+              dst[i + 3] = 255;
+            }
+          } else {
+            if (mode === 'binary') {
+              dst[i] = 0; dst[i + 1] = 0; dst[i + 2] = 0; dst[i + 3] = 255;
+            } else {
+              dst[i] = r * 0.25; dst[i + 1] = g * 0.25; dst[i + 2] = b * 0.25; dst[i + 3] = 255;
+            }
+          }
+        }
+        outCtx.putImageData(outData, 0, 0);
+
+        // Gambar AR Bounding Box informatif jika dalam mode overlay
+        if (mode === 'overlay' && matchedPixels > 500) {
+          outCtx.strokeStyle = '#34d399';
+          outCtx.lineWidth = 2;
+          outCtx.strokeRect(55, 55, 195, 190);
+          outCtx.fillStyle = '#064e3b';
+          outCtx.fillRect(55, 37, 175, 18);
+          outCtx.fillStyle = '#6ee7b7';
+          outCtx.font = '11px JetBrains Mono';
+          outCtx.fillText(`GRADE A: MATANG (${matchedPixels} px)`, 60, 49);
+        }
+
+      } else if (currentStage === 3) {
+        const op = document.getElementById('select-edge-op').value;
+        const th = parseInt(document.getElementById('slider-edge-th').value);
+        document.getElementById('val-edge-th').textContent = th;
+
+        // Konversi ke Grayscale
+        const gray = new Float32Array(400 * 300);
+        for (let i = 0; i < data.length; i += 4) {
+          gray[i / 4] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        }
+
+        let edgeCount = 0;
+        for (let y = 1; y < 299; y++) {
+          for (let x = 1; x < 399; x++) {
+            const idx = y * 400 + x;
+            let mag = 0;
+
+            if (op === 'sobel') {
+              const gx = -gray[(y - 1) * 400 + (x - 1)] + gray[(y - 1) * 400 + (x + 1)]
+                         -2 * gray[y * 400 + (x - 1)]   + 2 * gray[y * 400 + (x + 1)]
+                         -gray[(y + 1) * 400 + (x - 1)] + gray[(y + 1) * 400 + (x + 1)];
+              const gy = -gray[(y - 1) * 400 + (x - 1)] - 2 * gray[(y - 1) * 400 + x] - gray[(y - 1) * 400 + (x + 1)]
+                         +gray[(y + 1) * 400 + (x - 1)] + 2 * gray[(y + 1) * 400 + x] + gray[(y + 1) * 400 + (x + 1)];
+              mag = Math.sqrt(gx * gx + gy * gy);
+            } else {
+              // Kernel Laplacian 3x3
+              mag = Math.abs(
+                -4 * gray[idx] +
+                gray[(y - 1) * 400 + x] + gray[(y + 1) * 400 + x] +
+                gray[y * 400 + (x - 1)] + gray[y * 400 + (x + 1)]
+              ) * 2.5;
+            }
+
+            const pIdx = idx * 4;
+            if (mag > th) {
+              edgeCount++;
+              dst[pIdx] = 251; dst[pIdx + 1] = 191; dst[pIdx + 2] = 36; dst[pIdx + 3] = 255;
+            } else {
+              dst[pIdx] = 15; dst[pIdx + 1] = 23; dst[pIdx + 2] = 42; dst[pIdx + 3] = 255;
+            }
+          }
+        }
+        outCtx.putImageData(outData, 0, 0);
+
+        // Highlight AR area cacat pada sampel biji ke-6
+        if (!useWebcam) {
+          outCtx.strokeStyle = '#f43f5e';
+          outCtx.lineWidth = 2;
+          outCtx.strokeRect(285, 180, 70, 60);
+          outCtx.fillStyle = '#fda4af';
+          outCtx.font = '10px JetBrains Mono';
+          outCtx.fillText('DEFECT DETECTED', 278, 175);
+        }
+        document.getElementById('defect-score').textContent = `Tepi Terdeteksi: ${edgeCount} px`;
+      }
+    }
+
+    // Evaluasi Kuis Tahap 4
+    function evaluateQuiz(choice) {
+      const fb = document.getElementById('quiz-feedback');
+      fb.classList.remove('hidden', 'bg-emerald-950/60', 'border-emerald-500/40', 'text-emerald-200', 'bg-rose-950/60', 'border-rose-500/40', 'text-rose-200');
+
+      if (choice === 'A') {
+        fb.classList.add('bg-emerald-950/60', 'border-emerald-500/40', 'text-emerald-200');
+        fb.innerHTML = '<strong>Tepat Sekali!</strong> Ruang warna <strong>HSV</strong> memisahkan informasi warna murni (<em>Hue</em>) dari intensitas cahaya (<em>Value</em>), sehingga fluktuasi bayangan tidak merusak akurasi klasifikasi kematangan biji kopi Gayo.';
+        appendAIMessage('Tutor GenAI', 'Selamat! Anda berhasil menyelesaikan skenario sortasi kopi Gayo. Konsep pemisahan krominansi dan luminansi ini adalah fondasi utama sistem <em>computer vision</em> di industri agrikultur.');
+      } else {
+        fb.classList.add('bg-rose-950/60', 'border-rose-500/40', 'text-rose-200');
+        fb.innerHTML = '<strong>Kurang Tepat.</strong> Ingat kembali eksperimen VR di Tahap 1: pada ruang RGB, bayangan menurunkan nilai ketiga kanal sekaligus. Coba pilih opsi yang memisahkan informasi warna dari intensitas cahaya.';
+      }
+    }
+
+    // Mesin Tutor GenAI Kontekstual
+    function appendAIMessage(sender, htmlText) {
+      const box = document.getElementById('ai-chat-box');
+      const div = document.createElement('div');
+      const isUser = sender === 'Anda';
+      div.className = isUser
+        ? 'bg-indigo-950/60 border border-indigo-500/30 rounded-lg p-3 text-slate-100 ml-6'
+        : 'bg-slate-800/90 border border-slate-700 rounded-lg p-3 text-slate-200 mr-2';
+      div.innerHTML = `<span class="font-semibold ${isUser ? 'text-amber-300' : 'text-indigo-400'} block mb-1">${sender}:</span>${htmlText}`;
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function explainCurrentParams() {
+      if (currentStage === 1) {
+        const snr = document.getElementById('metric-snr').textContent;
+        appendAIMessage('Tutor GenAI', `Saat ini Anda berada di <strong>Lab VR Akuisisi</strong> dengan kondisi <strong>${snr}</strong>. Dalam pengolahan citra, pencahayaan yang buruk menurunkan rasio sinyal terhadap derau (SNR), menyebabkan algoritma segmentasi salah mengenali bayangan sebagai biji kopi cacat (<em>black bean</em>).`);
+      } else if (currentStage === 2) {
+        const h = document.getElementById('slider-hue').value;
+        const s = document.getElementById('slider-sat').value;
+        appendAIMessage('Tutor GenAI', `Parameter AR HSV Anda: <strong>Hue ≤ ${h}°</strong> dan <strong>Saturation ≥ ${s}%</strong>. Rentang Hue 0°–25° menangkap pigmen antosianin merah pada ceri kopi Gayo yang matang optimal, sementara batas Saturation mencegah latar belakang abu-abu ikut tersegmentasi.`);
+      } else if (currentStage === 3) {
+        const op = document.getElementById('select-edge-op').value.toUpperCase();
+        const th = document.getElementById('slider-edge-th').value;
+        appendAIMessage('Tutor GenAI', `Anda menggunakan operator <strong>${op}</strong> dengan threshold <strong>${th}</strong>. Operator ini menghitung turunan spasial intensitas piksel $\\nabla f = \\sqrt{G_x^2 + G_y^2}$ untuk menonjolkan diskontinuitas tekstur akibat lubang hama penggerek buah kopi (PBKo).`);
+      } else {
+        appendAIMessage('Tutor GenAI', 'Petunjuk Socratic: Perhatikan perbedaan antara kanal <em>Value</em> (kecerahan) dan kanal <em>Hue</em> (jenis warna). Kanal mana yang tetap stabil saat biji kopi terkena bayangan?');
+      }
+    }
+
+    function askPreset(q) {
+      document.getElementById('ai-input').value = q;
+      handleUserChat(new Event('submit'));
+    }
+
+    function handleUserChat(e) {
+      e.preventDefault();
+      const input = document.getElementById('ai-input');
+      const q = input.value.trim();
+      if (!q) return;
+      appendAIMessage('Anda', q);
+      input.value = '';
+
+      const lower = q.toLowerCase();
+      let reply = '';
+      if (lower.includes('hsv') || lower.includes('rgb')) {
+        reply = 'Pada ruang warna <strong>RGB</strong>, informasi warna dan kecerahan bercampur di ketiga kanal. Sebaliknya, <strong>HSV</strong> mengisolasi warna murni pada kanal <em>Hue</em> (0°–360°), sehingga perubahan pencahayaan pada meja sortasi kopi Gayo tidak menggeser nilai <em>Hue</em> secara signifikan.';
+      } else if (lower.includes('sobel') || lower.includes('rumus') || lower.includes('tepi')) {
+        reply = 'Operator <strong>Sobel</strong> melakukan konvolusi citra dengan dua kernel 3×3 (horizontal $G_x$ dan vertikal $G_y$). Magnitudo gradien dihitung melalui $G = \\sqrt{G_x^2 + G_y^2}$. Semakin tajam perubahan intensitas (seperti tepi lubang cacat biji), semakin besar nilai $G$.';
+      } else if (lower.includes('kasus') || lower.includes('acak')) {
+        const cases = [
+          '<strong>Studi Kasus 1:</strong> Kadar air biji kopi gabah pasca-jemur masih tinggi sehingga memantulkan cahaya (<em>specular highlight</em>). Solusi: Gunakan filter polarisasi pada kamera akuisisi dan operasi morfologi <em>Closing</em> untuk menutup lubang pantulan cahaya pada hasil segmentasi.',
+          '<strong>Studi Kasus 2:</strong> Biji kopi cacat sebagian (<em>spotted bean</em>) memiliki luas area warna cokelat kurang dari 15% total luas biji. Solusi: Hitung rasio luas piksel hasil segmentasi cacat terhadap luas kontur total biji menggunakan momen spasial.'
+        ];
+        reply = cases[Math.floor(Math.random() * cases.length)];
+      } else {
+        reply = 'Pertanyaan bagus! Dalam konteks klasifikasi mutu Kopi Arabika Gayo (standar SNI 01-2907-2008), kombinasi segmentasi warna <strong>HSV</strong> dan ekstraksi fitur bentuk/tepi <strong>Sobel</strong> mampu memisahkan biji utuh matang dari biji hitam, biji pecah, dan biji berlubang secara otomatis.';
+      }
+
+      setTimeout(() => appendAIMessage('Tutor GenAI', reply), 350);
+    }
+
+    // Inisialisasi awal
+    drawSyntheticGayoBeans();
+  </script>
+</body>
+</html>
